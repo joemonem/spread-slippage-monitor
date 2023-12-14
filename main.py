@@ -54,7 +54,7 @@ async def fetch_kucoin(session, url, trading_pair):
 
         best_bid = float(result["data"]["bestBid"])
         best_ask = float(result["data"]["bestAsk"])
-        spread = best_ask - best_bid
+        spread = ((best_ask - best_bid) / best_ask) * 100
 
         spread_entry = {
             "source": "KuCoin",
@@ -77,7 +77,7 @@ async def main():
     best_bid = float(kucoin_results[0]["data"]["bestBid"])
     best_ask = float(kucoin_results[0]["data"]["bestAsk"])
 
-    spread = best_ask - best_bid
+    spread = ((best_ask - best_bid) / best_ask) * 100
 
     # spread_entry = {
     #     "source": source,
