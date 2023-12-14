@@ -73,22 +73,8 @@ async def get_kucoin():
 
 
 async def main():
-    kucoin_info = await get_kucoin()
-    best_bid = float(kucoin_results[0]["data"]["bestBid"])
-    best_ask = float(kucoin_results[0]["data"]["bestAsk"])
+    await get_kucoin()
 
-    spread = ((best_ask - best_bid) / best_ask) * 100
-
-    # spread_entry = {
-    #     "source": source,
-    #     "trading_pair": trading_pair,
-    #     "spread": spread,
-    # }
-
-    # print(
-    #     f"The best bid is {best_bid}, the best ask is {best_ask}, and the spread is {spread}"
-    # )
-    # print(f"Here are the results in table form: {results_table}")
     with open("output.csv", "w", newline="") as csvfile:
         fieldnames = results_table[
             0
