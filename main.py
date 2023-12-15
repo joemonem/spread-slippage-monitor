@@ -3,7 +3,7 @@ import aiohttp
 import pandas as pd
 
 # Store 20 popular pairs, available on Binance and Kucoin
-kucoin_trading_pairs = [
+trading_pairs = [
     "BTC-USDT",
     "ETH-USDT",
     "SOL-USDT",
@@ -29,11 +29,9 @@ kucoin_trading_pairs = [
 # Kucoin ticker GET request
 kucoin_url = "https://api.kucoin.com/api/v1/market/orderbook/level1?symbol={}"
 
-# Binance
+# Binance ticker GET request
 binance_url = "https://api.binance.com/api/v3/ticker/24hr?symbol={}"
 
-
-kucoin_results = []
 kucoin_results_table = []
 binance_results_table = []
 
@@ -41,7 +39,7 @@ binance_results_table = []
 def get_kucoin_tasks(session):
     task_kucoin = []
 
-    for trading_pair in kucoin_trading_pairs:
+    for trading_pair in trading_pairs:
         task_kucoin.append(
             asyncio.create_task(
                 fetch_kucoin(session, kucoin_url.format(trading_pair), trading_pair)
@@ -54,7 +52,7 @@ def get_kucoin_tasks(session):
 def get_binance_tasks(session):
     task_binance = []
 
-    for trading_pair in kucoin_trading_pairs:
+    for trading_pair in trading_pairs:
         # Binance's format is BTCUSDT instead of BTC-USDT
         binance_pair = trading_pair.replace("-", "")
 
@@ -96,8 +94,6 @@ async def fetch_kucoin(session, url, trading_pair):
             "buy_order_slippage": slippage_percentage_buy,
             "sell_order_slippage": slippage_percentage_sell,
         }
-
-        # kucoin_results.append(result)
         kucoin_results_table.append(spread_entry)
 
 
@@ -130,22 +126,17 @@ async def fetch_binance(session, url, trading_pair):
             "buy_order_slippage": slippage_percentage_buy,
             "sell_order_slippage": slippage_percentage_sell,
         }
-
-        # kucoin_results.append(result)
         binance_results_table.append(spread_entry)
 
 
 async def get_kucoin():
     async with aiohttp.ClientSession() as session:
-        # Kucoin result's index is 0
-
         tasks = get_kucoin_tasks(session)
         await asyncio.gather(*tasks)
 
 
 async def get_binance():
     async with aiohttp.ClientSession() as session:
-        # Binance result's index is 1
         tasks = get_binance_tasks(session)
         await asyncio.gather(*tasks)
 
@@ -160,14 +151,14 @@ async def main():
     binance_data = pd.DataFrame(binance_results_table)
     binance_data.set_index(["source", "trading_pair"], inplace=True)
 
-    # Write to separate CSV files
+    # Create CSV files
     kucoin_data.to_csv("kucoin_output.csv", header=True)
     binance_data.to_csv("binance_output.csv", header=True)
 
     # Combine results from both tables
     combined_data = pd.concat([kucoin_data, binance_data])
 
-    # Alternatively, write to a single Excel file with a separate sheet for each source
+    # Create Excel file with a separate sheet for each source
     with pd.ExcelWriter("combined_results.xlsx") as writer:
         combined_data.to_excel(writer, sheet_name="Combined")
         kucoin_data.to_excel(writer, sheet_name="KuCoin")
