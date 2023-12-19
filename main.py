@@ -30,7 +30,10 @@ trading_pairs = [
 ]
 
 # Binance websocket URL
-binance_url = "wss://stream.binance.com:9443/ws/{}@ticker"
+# ticker refreshes every second, bookTicker updates in real time
+
+binance_url = "wss://stream.binance.com:9443/ws/btcusdt@ticker"
+
 
 binance_results_table = []
 ws = None  # Single websocket connection object
@@ -42,7 +45,6 @@ def on_open(ws):
     for pair in trading_pairs:
         binance_pair = pair.replace("-", "").lower()
         print(binance_pair)
-        ws.subscribe(binance_url.format(binance_pair))
 
 
 def on_close(ws, close_status_code, close_msg):
@@ -52,12 +54,34 @@ def on_close(ws, close_status_code, close_msg):
 def on_error(ws, error):
     print(f"The error message is {error}")
 
+    ws.close()
+
 
 def on_message(ws, message):
     data = json.loads(message)  # Parse JSON message
-    # Extract relevant data and perform analysis/store in results table
-    # ... Implement data processing logic
-    print(f"Processed data for: {data['symbol']}")
+
+    print(f"Processed data for: {data}")
+
+    # Extract last price
+    last_price = data["c"]
+    print("Last price is: {}", last_price)
+
+    # Extract best ask
+    best_ask = data["a"]
+    print("Best ask is: {}", best_ask)
+
+    # extract best bid
+    best_bid = data["b"]
+    print("Best bid is: {}", best_bid)
+
+    # Calculate spread
+
+    # Calculate slippage
+
+    # Add results to database
+
+    # Do this just once for testing
+    ws.close()
 
 
 def get_binance_tasks():
