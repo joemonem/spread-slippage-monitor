@@ -4,40 +4,41 @@ import ssl
 import json
 import sqlite3
 from datetime import datetime
+import requests
 
 
-# Store 20 popular pairs, available on both Binance and Kucoin
+# Store 20 popular pairs, available on both Kucoin and Kucoin
 trading_pairs = [
     "BTC-USDT",
-    "ETH-USDT",
-    "SOL-USDT",
-    "INJ-USDT",
-    "BTC-USDC",
-    "AVAX-USDT",
-    "ADA-USDT",
-    "BONK-USDT",
-    "TIA-USDT",
-    "XRP-USDT",
-    "ETH-USDC",
-    "FET-USDT",
-    "JTO-USDT",
-    "MATIC-USDT",
-    "DOT-USDT",
-    "RUNE-USDT",
-    "ATOM-USDT",
-    "LINK-USDT",
-    "ETH-BTC",
-    "DOGE-USDT",
+    # "ETH-USDT",
+    # "SOL-USDT",
+    # "INJ-USDT",
+    # "BTC-USDC",
+    # "AVAX-USDT",
+    # "ADA-USDT",
+    # "BONK-USDT",
+    # "TIA-USDT",
+    # "XRP-USDT",
+    # "ETH-USDC",
+    # "FET-USDT",
+    # "JTO-USDT",
+    # "MATIC-USDT",
+    # "DOT-USDT",
+    # "RUNE-USDT",
+    # "ATOM-USDT",
+    # "LINK-USDT",
+    # "ETH-BTC",
+    # "DOGE-USDT",
 ]
 
-# Binance websocket URL
+# Kucoin websocket URL
 # ticker refreshes every second, bookTicker updates in real time
 # Using the ticker in this case to avoid frying my hardware
 
-binance_url = "wss://stream.binance.com:9443/ws/{}@ticker"
+kucoin_url = "wss://ws-api-spot.kucoin.com/market/ticker:{}?token=2neAiuYvAU61ZDXANAGAsiL4-iAExhsBXZxftpOeh_55i3Ysy2q2LEsEWU64mdzUOPusi34M_wGoSf7iNyEWJ9gDkELGuNf9D28R6CUFDAEkXnY7BeaM69iYB9J6i9GjsxUuhPw3BlrzazF6ghq4L5cGbq4apP9OyMXVCWwjhsg=.WGxzfigRuE8puTaCMk6gdA=="
 
 # Establish connection with database
-pool = sqlite3.connect("market_data.db")
+pool = sqlite3.connect("kucoin_market_data.db")
 
 # Create the table if it doesn't exist (with appropriate data types)
 with pool:
@@ -90,24 +91,24 @@ db_entries = []
 async def on_message(ws, message):
     global db_entries
     data = json.loads(message)  # Parse JSON message
-    print(f"Displaying this data:{data}")
+    print(f"the data is {data}")
 
     # Get precise time of the data in unix time then covert to datetime object for the database. We divide unix_date by 1000 since it's provided in milliseconds and we need it in seconds
-    # bookTicker is too busy to return the time so we'd use .now()
-    unix_date = data["E"]
-    date = datetime.fromtimestamp(unix_date / 1000)
+    date = datetime.now()
 
-    # Get trading paird
-    trading_pair = data["s"]
+    # Get trading pair
+    # The topic contains the trading pair after a colon
+    topic = data["topic"]
+    trading_pair = topic.split(":")[1]
 
     # Extract last price
-    last_price = float(data["c"])
+    last_price = float(data["data"]["price"])
 
     # Extract best ask
-    best_ask = float(data["a"])
+    best_ask = float(data["data"]["bestAsk"])
 
     # Extract best bid
-    best_bid = float(data["b"])
+    best_bid = float(data["data"]["bestBid"])
 
     # Calculate spread
     # Spread is the difference between the best ask and bid
@@ -122,7 +123,7 @@ async def on_message(ws, message):
     # Store the entry in a tuple
     spread_entry = (
         date,
-        "Binance",
+        "Kucoin",
         trading_pair,
         spread,
         slippage_percentage_buy,
@@ -133,14 +134,14 @@ async def on_message(ws, message):
     db_entries.append(spread_entry)
 
 
-async def connect_to_binance(pair):
-    binance_pair = pair.replace("-", "").lower()
-    uri = binance_url.format(binance_pair)
+async def connect_to_kucoin(pair):
+    uri = kucoin_url.format(pair)
+    print(uri)
     async with websockets.connect(uri, ssl=ssl.SSLContext()) as ws:
-        await asyncio.gather(listen_binance(ws), write_to_database(ws))
+        await asyncio.gather(listen_kucoin(ws), write_to_database(ws))
 
 
-async def listen_binance(ws):
+async def listen_kucoin(ws):
     while True:
         try:
             message = await ws.recv()
@@ -158,10 +159,23 @@ async def write_to_database(ws):
             db_entries = []
 
 
-async def get_binance_tasks():
-    tasks = [connect_to_binance(pair) for pair in trading_pairs]
+async def get_kucoin_tasks():
+    tasks = [connect_to_kucoin(pair) for pair in trading_pairs]
     await asyncio.gather(*tasks)
 
 
+async def main():
+    # Open connection with KuCoin
+    connect = requests.post("https://api.kucoin.com/api/v1/bullet-public")
+    connect_response = connect.json()
+    token = connect_response["data"]["token"]
+    print(f"Token is", token)
+
+    await get_kucoin_tasks()
+
+
 if __name__ == "__main__":
-    asyncio.run(get_binance_tasks())
+    asyncio.run(main())
+
+
+"welcome message: nOoY1IK608"
