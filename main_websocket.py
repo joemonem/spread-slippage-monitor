@@ -1,7 +1,5 @@
 import asyncio
-import aiohttp
-import pandas as pd
-import websocket
+import websockets
 import ssl
 import json
 import sqlite3
@@ -11,29 +9,30 @@ from datetime import datetime
 # Store 20 popular pairs, available on both Binance and Kucoin
 trading_pairs = [
     "BTC-USDT",
-    # "ETH-USDT",
-    # "SOL-USDT",
-    # "INJ-USDT",
-    # "BTC-USDC",
-    # "AVAX-USDT",
-    # "ADA-USDT",
-    # "BONK-USDT",
-    # "TIA-USDT",
-    # "XRP-USDT",
-    # "ETH-USDC",
-    # "FET-USDT",
-    # "JTO-USDT",
-    # "MATIC-USDT",
-    # "DOT-USDT",
-    # "RUNE-USDT",
-    # "ATOM-USDT",
-    # "LINK-USDT",
-    # "ETH-BTC",
-    # "DOGE-USDT",
+    "ETH-USDT",
+    "SOL-USDT",
+    "INJ-USDT",
+    "BTC-USDC",
+    "AVAX-USDT",
+    "ADA-USDT",
+    "BONK-USDT",
+    "TIA-USDT",
+    "XRP-USDT",
+    "ETH-USDC",
+    "FET-USDT",
+    "JTO-USDT",
+    "MATIC-USDT",
+    "DOT-USDT",
+    "RUNE-USDT",
+    "ATOM-USDT",
+    "LINK-USDT",
+    "ETH-BTC",
+    "DOGE-USDT",
 ]
 
 # Binance websocket URL
 # ticker refreshes every second, bookTicker updates in real time
+# Using the ticker in this case to avoid frying my hardware
 
 binance_url = "wss://stream.binance.com:9443/ws/{}@ticker"
 
@@ -96,7 +95,7 @@ def on_error(ws, error):
 db_entries = []
 
 
-def on_message(ws, message):
+async def on_message(ws, message):
     global db_entries
     data = json.loads(message)  # Parse JSON message
 
@@ -141,37 +140,46 @@ def on_message(ws, message):
         slippage_percentage_sell,
     )
 
-    # Add results to database
     # Buffer entries for batch insertion
     db_entries.append(spread_entry)
-
-    # Insert every 5 seconds
-    if len(db_entries) >= 5:
-        append_data(db_entries)
-        db_entries = []  # Clear the buffer
 
     # Do this just once for testing
     # ws.close()
 
 
-def get_binance_tasks():
-    # Start the websocket connection with handlers
-    global ws
-    for pair in trading_pairs:
-        binance_pair = pair.replace("-", "").lower()
-        ws = websocket.WebSocketApp(
-            url=binance_url.format(binance_pair),
-            on_open=on_open,
-            on_close=on_close,
-            on_error=on_error,
-            on_message=on_message,
-        )
-        ws.run_forever(sslopt={"cert_reqs": ssl.CERT_NONE})
+async def connect_to_binance(pair):
+    binance_pair = pair.replace("-", "").lower()
+    uri = binance_url.format(binance_pair)
+    async with websockets.connect(uri, ssl=ssl.SSLContext()) as ws:
+        await asyncio.gather(listen_binance(ws), write_to_database(ws))
 
 
-def main():
-    get_binance_tasks()
+async def listen_binance(ws):
+    while True:
+        try:
+            message = await ws.recv()
+            await on_message(ws, message)
+        except websockets.exceptions.ConnectionClosed:
+            break
+
+
+async def write_to_database(ws):
+    while True:
+        await asyncio.sleep(5)  # Interestingly, the app doesn't work without this line
+        global db_entries
+        if db_entries:
+            append_data(db_entries)
+            db_entries = []
+
+
+async def get_binance_tasks():
+    tasks = [connect_to_binance(pair) for pair in trading_pairs]
+    await asyncio.gather(*tasks)
+
+
+async def main():
+    await get_binance_tasks()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
