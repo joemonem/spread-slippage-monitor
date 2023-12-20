@@ -36,12 +36,6 @@ trading_pairs = [
 
 binance_url = "wss://stream.binance.com:9443/ws/{}@ticker"
 
-
-binance_results_table = []
-
-ws = None  # Single websocket connection object
-
-
 # Establish connection with database
 pool = sqlite3.connect("market_data.db")
 
@@ -66,7 +60,6 @@ with pool:
 def append_data(entries):
     with pool:
         cursor = pool.cursor()
-        print(f"Inserting data into the database: {entries}")
 
         cursor.executemany(
             """
@@ -75,7 +68,6 @@ def append_data(entries):
         """,
             entries,
         )
-        print("Data inserted successfully.")
 
 
 def on_open(ws):
@@ -99,8 +91,6 @@ async def on_message(ws, message):
     global db_entries
     data = json.loads(message)  # Parse JSON message
 
-    print(f"Processed data for: {data}")
-
     # Get precise time of the data in unix time then covert to datetime object for the database. We divide unix_date by 1000 since it's provided in milliseconds and we need it in seconds
     unix_date = data["E"]
     date = datetime.fromtimestamp(unix_date / 1000)
@@ -110,15 +100,12 @@ async def on_message(ws, message):
 
     # Extract last price
     last_price = float(data["c"])
-    print("Last price is:", last_price)
 
     # Extract best ask
     best_ask = float(data["a"])
-    print("Best ask is:", best_ask)
 
     # Extract best bid
     best_bid = float(data["b"])
-    print("Best bid is:", best_bid)
 
     # Calculate spread
     # Spread is the difference between the best ask and bid
@@ -133,7 +120,7 @@ async def on_message(ws, message):
     # Store the entry in a tuple
     spread_entry = (
         date,
-        "KuCoin",
+        "Binance",
         trading_pair,
         spread,
         slippage_percentage_buy,
@@ -142,9 +129,6 @@ async def on_message(ws, message):
 
     # Buffer entries for batch insertion
     db_entries.append(spread_entry)
-
-    # Do this just once for testing
-    # ws.close()
 
 
 async def connect_to_binance(pair):
@@ -177,9 +161,5 @@ async def get_binance_tasks():
     await asyncio.gather(*tasks)
 
 
-async def main():
-    await get_binance_tasks()
-
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(get_binance_tasks())
